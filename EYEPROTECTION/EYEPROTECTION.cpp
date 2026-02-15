@@ -1,5 +1,8 @@
 #include <windows.h>
 #include <shellapi.h>
+#include <dwmapi.h>
+#pragma comment(lib, "dwmapi.lib")
+
 
 #define IDT_WORK_TIMER   1
 #define IDT_BLINK_TIMER  2
@@ -15,7 +18,7 @@
 #define REG_Y    L"PosY"
 #define REG_ENABLED L"Enabled"
 
-const int WORK_INTERVAL = 15 * 60 * 1000; // testing
+const int WORK_INTERVAL = 5 * 1000; // testing
 const int BLINK_SECONDS = 20;
 
 HWND hPopup = nullptr;
@@ -99,14 +102,14 @@ void SaveEnabledState(bool enabled)
 void CreateUIFont()
 {
     hUIFont = CreateFont(
-        20,                    // height (px)
+        22,
         0, 0, 0,
-        FW_SEMIBOLD,           // slightly bold
+        FW_BOLD,
         FALSE, FALSE, FALSE,
         DEFAULT_CHARSET,
         OUT_DEFAULT_PRECIS,
         CLIP_DEFAULT_PRECIS,
-        CLEARTYPE_QUALITY,     // smooth text
+        CLEARTYPE_QUALITY,
         DEFAULT_PITCH | FF_SWISS,
         L"Segoe UI"
     );
@@ -183,7 +186,11 @@ void ShowTrayMenu(HWND hwnd)
 
 /* ---------------- Entry ---------------- */
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
+int WINAPI wWinMain(
+    _In_ HINSTANCE hInstance,
+    _In_opt_ HINSTANCE,
+    _In_ PWSTR,
+    _In_ int)
 {
     EnableAutoStart();
     CreateUIFont();
@@ -236,7 +243,7 @@ LRESULT CALLBACK MainProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 pwc.lpfnWndProc = PopupProc;
                 pwc.hInstance = GetModuleHandle(nullptr);
                 pwc.lpszClassName = L"EyeProtectorPopup";
-                pwc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+                pwc.hbrBackground = NULL;
                 RegisterClass(&pwc);
                 popupRegistered = true;
             }
@@ -244,16 +251,25 @@ LRESULT CALLBACK MainProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             int x, y;
             POINT p = LoadSavedPosition(x, y)
                 ? POINT{ x, y }
-            : CenterPopup(300, 140);
+            : CenterPopup(340, 180);
 
             hPopup = CreateWindowEx(
-                WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+                WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED,
                 L"EyeProtectorPopup",
                 L"",
                 WS_POPUP | WS_VISIBLE,
-                p.x, p.y, 300, 140,
+                p.x, p.y, 340, 180,
                 hwnd, nullptr, GetModuleHandle(nullptr), nullptr
             );
+
+            SetLayeredWindowAttributes(
+                hPopup,
+                0,
+                255,
+                LWA_ALPHA
+            );
+
+
 
             SetTimer(hPopup, IDT_BLINK_TIMER, 1000, nullptr);
         }
@@ -292,13 +308,60 @@ LRESULT CALLBACK PopupProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg)
     {
+    case WM_CTLCOLORSTATIC:
+    {
+        HDC hdc = (HDC)wParam;
+        SetTextColor(hdc, RGB(240, 240, 240));
+        SetBkColor(hdc, RGB(30, 30, 30));
+        static HBRUSH hBrush = CreateSolidBrush(RGB(30, 30, 30));
+        return (LRESULT)hBrush;
+    }
+    case WM_PAINT:
+    {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+
+        RECT rect;
+        GetClientRect(hwnd, &rect);
+
+        HBRUSH hBrush = CreateSolidBrush(RGB(30, 30, 30));
+        FillRect(hdc, &rect, hBrush);
+        DeleteObject(hBrush);
+
+        EndPaint(hwnd, &ps);
+        return 0;
+    }
+
+
+
+
     case WM_CREATE:
+    {
+        BOOL value = TRUE;
+        DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_USE_IMMERSIVE_DARK_MODE,
+            &value,
+            sizeof(value)
+        );
+
+        DWM_WINDOW_CORNER_PREFERENCE preference = DWMWCP_ROUND;
+        DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_WINDOW_CORNER_PREFERENCE,
+            &preference,
+            sizeof(preference)
+        );
+
+        
+
+
         hText = CreateWindow(
             L"STATIC",
             L"Look far and blink\n20 seconds",
-            WS_CHILD | WS_VISIBLE | SS_CENTER | SS_EDITCONTROL,
+            WS_CHILD | WS_VISIBLE | SS_CENTER ,
 
-            20, 15, 260, 40,
+            30, 30, 280, 60,
             hwnd, nullptr, nullptr, nullptr
         );
         SendMessage(hText, WM_SETFONT, (WPARAM)hUIFont, TRUE);
@@ -308,7 +371,7 @@ LRESULT CALLBACK PopupProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             L"BUTTON",
             L"Done",
             WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
-            100, 75, 100, 30,
+            120, 115, 100, 35,
             hwnd, (HMENU)ID_BTN_DONE, nullptr, nullptr
         );
         SendMessage(
@@ -319,7 +382,7 @@ LRESULT CALLBACK PopupProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         );
 
         break;
-
+    }
     case WM_LBUTTONDOWN:
         ReleaseCapture();
         SendMessage(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);

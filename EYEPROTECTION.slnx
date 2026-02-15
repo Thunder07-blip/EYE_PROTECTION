@@ -3,5 +3,5 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="EYEPROTECTION/EYEPROTECTION.vcxproj" />
+  <Project Path="EYEPROTECTION/EYEPROTECTION.vcxproj" Id="14c60613-0e5f-41fd-9700-cd28ad0071de" />
 </Solution>
