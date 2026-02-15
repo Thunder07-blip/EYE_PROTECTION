@@ -18,7 +18,7 @@
 #define REG_Y    L"PosY"
 #define REG_ENABLED L"Enabled"
 
-const int WORK_INTERVAL = 5 * 1000; // testing
+const int WORK_INTERVAL = 10 * 1000; 
 const int BLINK_SECONDS = 20;
 
 HWND hPopup = nullptr;
